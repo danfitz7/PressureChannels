@@ -896,7 +896,7 @@ ENDDFS
 
 
 # Headers and Aerotech appeasement
-Aerotech=False
+Aerotech=True
 if (Aerotech):
     g.write(startCode)
     g.write(homingCode)
@@ -918,7 +918,7 @@ petri_center_y = 128.601
 stem_length = 2 # connection to needle insertion
 inlet_length = 3# needle insertion
 travel_height =0.5*mold_depth+3 #mold_z_zero+mold_depth + 3   # safe travel height (abs)
-interconnect_dwell_time = 0.5 #in seconds
+interconnect_dwell_time = 0.7 #in seconds
 
 #feeds and speeds
 pressures = [85,33] # (psi) line pressure to ink nozzle
@@ -948,7 +948,6 @@ g.write(
 g.set_pressure(com_ports[0], pressures[0])
 g.set_pressure(com_ports[1], pressures[1])
 
- 
 def change_tool(to_tool_index):
     global cur_tool_index
     global g
@@ -980,15 +979,17 @@ def print_inlet(up):
     
     down_to_print_height()
         
-    #print the inlet
+    #start extrusion
     g.toggle_pressure(com_ports[cur_tool_index]) # start extrusion of regular pluronic
     g.dwell(0.5)
-    g.feed(inlet_print_speed)
-    g.move(y=direction_multiplier*inlet_length)
-        
+    
     #print the stem
     g.feed(print_speed)
     g.move(y=direction_multiplier*stem_length)
+        
+    #print the inlet
+    g.feed(inlet_print_speed)
+    g.move(y=direction_multiplier*inlet_length)
         
     #dwell at end of stem to make good pressure chamber interconnect
     g.dwell(interconnect_dwell_time)
@@ -1025,7 +1026,7 @@ def print_pressure_channel(length_index, channel_speed_index):
     g.dwell(interconnect_dwell_time)
     g.toggle_pressure(com_ports[1])
     up_to_travel_height()        
-    change_tool(0) # change back to the first tool           
+    if (Aerotech): change_tool(0) # change back to the first tool           
     ### END PLATINUM PRESSUE CHAMBER ###
           
 
@@ -1034,7 +1035,6 @@ def print_pressure_channel(length_index, channel_speed_index):
 #go to tip of bottom inlet of leftmost chamber from the center of the petri dish
 g.feed(air_travel_speed)
 g.write("ABSOLUTE")
-change_tool(1)
 g.abs_move(x=petri_center_x-3.5*separation_dist, y=petri_center_y-0.5*pressure_channel_lengths[0]) 
 g.abs_move(**{tools[0]:travel_height})
 g.abs_move(**{tools[1]:travel_height})
@@ -1046,24 +1046,26 @@ for length_index in range(len(pressure_channel_lengths)):
     for channel_speed_index in range(len(pressure_channel_speeds)):
         g.write("\n; Speed = "+str(pressure_channel_speeds[channel_speed_index])+".")
         
-        #assume we start above the bottom end of the pressure chamber/channel
+        #assume we start above the bottom end of the pressure chamber/channel witht the regular ink tool
         print_pressure_channel(length_index, channel_speed_index)
         
-        print_inlet(False) # print the bottom inlet    
+        print_inlet(True) # print the bottom inlet    
 
         #move over the tip of the bottom inlet of this chamber
         g.feed(air_travel_speed)
         g.move(y=-(pressure_channel_lengths[length_index]+inlet_length+stem_length))
         
-        print_inlet(True) #print the top inlet
+        print_inlet(False) #print the top inlet
 
         # move to bottom tip of next chamber of this length
         if (channel_speed_index < len(pressure_channel_lengths)-1):
+            g.feed(air_travel_speed)
             g.move(x=separation_dist, y = (stem_length+inlet_length))                                            
                                                                                                                                                     
     #move over the tip of the next inlet (if we're not done with the array)
     if (length_index<len(pressure_channel_lengths)-1):
-        g.move(x=separation_dist, y=-(0.5*(pressure_channel_lengths[length_index+1]-pressure_channel_lengths[length_index]))) #stem_length+inlet_length+
+        g.feed(air_travel_speed)
+        g.move(x=separation_dist, y=(stem_length+inlet_length)-(0.5*(pressure_channel_lengths[length_index+1]-pressure_channel_lengths[length_index])))
     
           
 g.write("; End Script")    
