@@ -914,14 +914,15 @@ interconnect_dwell_time = 0.5 #in seconds
 
 #feeds and speeds
 pressures = [85,33] # (psi) line pressure to ink nozzle
-matrix_travel_speed = 0.75 # (in mm/s) travel in matrix speed
+matrix_travel_speed = 0.75  # (in mm/s) travel in matrix speed
 inlet_print_speed = 0.5     # (in mm/s) stem (needle insertion) print speed
-air_travel_speed = 20      # (in mm/s) air travel
-print_speed = 1            # (in mm/s)
+air_travel_speed = 20       # (in mm/s) air travel
+print_speed = 1             # (in mm/s)
 
 # pressure channel parameters
 separation_dist = 4 #distance between paralell channels
 pressure_channel_lengths = [5,20,15]
+pressure_channel_end_length = 2 #this much of the ends of the pressure channel are a set length adn speed for cood connection
 pressure_channel_speeds = [inlet_print_speed/s for s in [1.0,1.5, 2.0]]
 
 # Headers and Aerotech appeasement
@@ -956,18 +957,21 @@ def change_tool(to_tool_index):
                                 
 def down_to_print_height():
     global g
+    g.write("; move down to print height")
     #move down to print height
     g.feed(matrix_travel_speed)
     g.abs_move(**{tools[cur_tool_index]:print_height})
 
 def up_to_travel_height():
     global g
+    g.write("; move up to travel height")
     #come up to travel height
     g.feed(matrix_travel_speed)
     g.abs_move(**{tools[cur_tool_index]:travel_height})
 
 def print_inlet(up):
     global g
+    g.write("; inlet")
     direction_multiplier = (1 if up else -1)
     
     down_to_print_height()
@@ -1013,13 +1017,29 @@ for length_index in range(len(pressure_channel_lengths)):
         print_inlet(False) #print the top inlet
 
         ### PLATINUM PRESSUE CHAMBER ###
+        g.write("; make the pressure chamber/channel")
         change_tool(1) #chaneg to the second tool
         #move over the top tip of the pressure chamber channel
         down_to_print_height()
+        
+        #start extrusion
         g.toggle_pressure(com_ports[1])
         g.dwell(interconnect_dwell_time)
+        
+        #make the end connection segment
+        g.feed(print_speed)
+        g.move(y=-pressure_channel_end_length)
+        
+        #make the main chamber
         g.feed(pressure_channel_speeds[channel_speed_index])
-        g.move(y=-pressure_channel_lengths[length_index])
+        g.move(y=-pressure_channel_lengths[length_index]-2*pressure_channel_end_length)
+        
+        #make the end connection segment
+        g.feed(print_speed)
+        g.move(y=-pressure_channel_end_length)
+        
+        #end extrusion
+        g.write("; done with end inlet")
         g.dwell(interconnect_dwell_time)
         g.toggle_pressure(com_ports[1])
         up_to_travel_height()        
