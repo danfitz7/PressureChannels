@@ -894,9 +894,17 @@ ENDDFS
 
 """
 
+
+# Headers and Aerotech appeasement
+Aerotech=False
+if (Aerotech):
+    g.write(startCode)
+    g.write(homingCode)
+    g.write(startCode_2)
+
 #misc printer parameters
 com_ports = [9, 4]
-tools = ["A","B"]
+tools = (["A","B"] if Aerotech else ["z","z"])
 cur_tool_index = 0
 
 #specific to the mold
@@ -925,10 +933,6 @@ pressure_channel_lengths = [5,20,15]
 pressure_channel_end_length = 2 #this much of the ends of the pressure channel are a set length adn speed for cood connection
 pressure_channel_speeds = [inlet_print_speed/s for s in [1.0,1.5, 2.0]]
 
-# Headers and Aerotech appeasement
-g.write(startCode)
-g.write(homingCode)
-g.write(startCode_2)
 
 g.write(
 """
@@ -992,11 +996,45 @@ def print_inlet(up):
         
     up_to_travel_height()
 
+#prints a pressure chamber channel for the given speed indec and length index in the -Y direction
+def print_pressure_channel(length_index, channel_speed_index):
+    ### PLATINUM PRESSUE CHAMBER ###
+    g.write("; make the pressure chamber/channel")
+    change_tool(1) #change to the second tool
+    #move over the top tip of the pressure chamber channel
+    down_to_print_height()
+        
+    #start extrusion
+    g.toggle_pressure(com_ports[1])
+    g.dwell(interconnect_dwell_time)
+        
+    #make the end connection segment
+    g.feed(print_speed)
+    g.move(y=pressure_channel_end_length)
+        
+    #make the main chamber
+    g.feed(pressure_channel_speeds[channel_speed_index])
+    g.move(y=pressure_channel_lengths[length_index]-2*pressure_channel_end_length)
+        
+    #make the end connection segment
+    g.feed(print_speed)
+    g.move(y=pressure_channel_end_length)
+        
+    #end extrusion
+    g.write("; done with end inlet")
+    g.dwell(interconnect_dwell_time)
+    g.toggle_pressure(com_ports[1])
+    up_to_travel_height()        
+    change_tool(0) # change back to the first tool           
+    ### END PLATINUM PRESSUE CHAMBER ###
+          
+
 #MAKE ARRAY
 
 #go to tip of bottom inlet of leftmost chamber from the center of the petri dish
 g.feed(air_travel_speed)
 g.write("ABSOLUTE")
+change_tool(1)
 g.abs_move(x=petri_center_x-3.5*separation_dist, y=petri_center_y-0.5*pressure_channel_lengths[0]) 
 g.abs_move(**{tools[0]:travel_height})
 g.abs_move(**{tools[1]:travel_height})
@@ -1008,56 +1046,30 @@ for length_index in range(len(pressure_channel_lengths)):
     for channel_speed_index in range(len(pressure_channel_speeds)):
         g.write("\n; Speed = "+str(pressure_channel_speeds[channel_speed_index])+".")
         
-        print_inlet(True) # print the bottom inlet    
+        #assume we start above the bottom end of the pressure chamber/channel
+        print_pressure_channel(length_index, channel_speed_index)
+        
+        print_inlet(False) # print the bottom inlet    
 
-        #move over the tip of the top inlet of this chamber
+        #move over the tip of the bottom inlet of this chamber
         g.feed(air_travel_speed)
-        g.move(y=(pressure_channel_lengths[length_index]+inlet_length+stem_length))
+        g.move(y=-(pressure_channel_lengths[length_index]+inlet_length+stem_length))
         
-        print_inlet(False) #print the top inlet
+        print_inlet(True) #print the top inlet
 
-        ### PLATINUM PRESSUE CHAMBER ###
-        g.write("; make the pressure chamber/channel")
-        change_tool(1) #chaneg to the second tool
-        #move over the top tip of the pressure chamber channel
-        down_to_print_height()
-        
-        #start extrusion
-        g.toggle_pressure(com_ports[1])
-        g.dwell(interconnect_dwell_time)
-        
-        #make the end connection segment
-        g.feed(print_speed)
-        g.move(y=-pressure_channel_end_length)
-        
-        #make the main chamber
-        g.feed(pressure_channel_speeds[channel_speed_index])
-        g.move(y=-pressure_channel_lengths[length_index]-2*pressure_channel_end_length)
-        
-        #make the end connection segment
-        g.feed(print_speed)
-        g.move(y=-pressure_channel_end_length)
-        
-        #end extrusion
-        g.write("; done with end inlet")
-        g.dwell(interconnect_dwell_time)
-        g.toggle_pressure(com_ports[1])
-        up_to_travel_height()        
-        change_tool(0) # change back to the first tool           
-        ### END PLATINUM PRESSUE CHAMBER ###
-          
         # move to bottom tip of next chamber of this length
         if (channel_speed_index < len(pressure_channel_lengths)-1):
-            g.move(x=separation_dist, y = -(stem_length+inlet_length))                                            
+            g.move(x=separation_dist, y = (stem_length+inlet_length))                                            
                                                                                                                                                     
     #move over the tip of the next inlet (if we're not done with the array)
     if (length_index<len(pressure_channel_lengths)-1):
-        g.move(x=separation_dist, y=-(stem_length+inlet_length+0.5*(pressure_channel_lengths[length_index+1]-pressure_channel_lengths[length_index])))
+        g.move(x=separation_dist, y=-(0.5*(pressure_channel_lengths[length_index+1]-pressure_channel_lengths[length_index]))) #stem_length+inlet_length+
     
           
 g.write("; End Script")    
     
-g.write(endCode)    
+if (Aerotech):
+    g.write(endCode)    
     
 g.view()
 
